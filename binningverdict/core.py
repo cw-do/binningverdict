@@ -24,6 +24,8 @@ Verdict rule (default tolerance = 0.10):
 
 import numpy as np
 
+_trapezoid = getattr(np, "trapezoid", np.trapz)
+
 
 # ---------------------------------------------------------------------------
 # Core scalar quantities
@@ -31,10 +33,10 @@ import numpy as np
 def _moments(Q, I, sigma2, I_prime):
     """Compute the four Q-moments entering R_MSE."""
     L = Q[-1] - Q[0]
-    sigma_bar_sq = np.trapezoid(sigma2,             Q) / L
-    J1_sigma     = np.trapezoid(sigma2 / Q,         Q) / L
-    beta_bar     = np.trapezoid(I_prime ** 2,       Q) / L
-    J2           = np.trapezoid(Q**2 * I_prime**2,  Q) / L
+    sigma_bar_sq = _trapezoid(sigma2,             Q) / L
+    J1_sigma     = _trapezoid(sigma2 / Q,         Q) / L
+    beta_bar     = _trapezoid(I_prime ** 2,       Q) / L
+    J2           = _trapezoid(Q**2 * I_prime**2,  Q) / L
     return sigma_bar_sq, J1_sigma, beta_bar, J2
 
 

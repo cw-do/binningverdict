@@ -54,6 +54,32 @@ The returned dictionary contains:
 | `verdict`            | `'log'` / `'linear'` / `'tied'`                      |
 | `rationale`          | human-readable explanation                           |
 
+## Command-line use
+
+For a single ASCII I(q) file:
+
+```bash
+python binningverdict.py your_measurement_Iq.dat
+```
+
+Input files may be `.dat` or `.txt` files with headers and at least three
+numeric columns:
+
+```text
+Q intensity intensity_error [Q_error]
+```
+
+The optional fourth `Q_error` column is accepted but ignored. For multiple
+files or glob patterns:
+
+```bash
+python binningverdict.py *_Iq.dat
+```
+
+Batch mode writes `binningverdict_report.txt` as a tab-delimited table with
+the file name, verdict, `R_MSE`, `R_MSE_subsampled`, `converged`,
+`R_Fisher_finite`, and rationale.
+
 ## Examples
 
 The `examples/` folder contains:
