@@ -1,11 +1,14 @@
 # binningverdict
 
 A quantitative log-vs-linear binning decision system for small-angle
-neutron scattering (SANS) data, accompanying the paper:
+neutron scattering (SANS) data, accompanying the submitted manuscript:
 
 > *Logarithmic versus linear binning in small-angle neutron scattering: a
 > unified decision system synthesizing four decades of information-theoretic
-> and statistical analyses*, Comput. Phys. Commun. (in press).
+> and statistical analyses*.
+
+The manuscript being submitted is included in this repository as
+[`manuscript.pdf`](manuscript.pdf).
 
 Given a measured intensity profile `(Q, I, sigma)`, the workflow returns a
 verdict of `'log'`, `'linear'`, or `'tied'` based on a closed-form ratio
@@ -16,7 +19,7 @@ reported when a parametric model is supplied.
 ## Installation
 
 ```bash
-git clone https://github.com/<your-username>/binningverdict
+git clone https://github.com/cw-do/binningverdict
 cd binningverdict
 pip install -e .
 ```
@@ -74,7 +77,7 @@ If you use `binningverdict` in published work, please cite:
 
 ```bibtex
 @article{binningverdict2026,
-  author  = {Do, C. and Tung, C.-H. and Chen, W.-R.},
+  author  = {Do, Changwoo and Ding, Lijie and Tung, Chi-Huan and Chen, Wei-Ren},
   title   = {Logarithmic versus linear binning in small-angle neutron
              scattering: a unified decision system},
   journal = {TBD},
