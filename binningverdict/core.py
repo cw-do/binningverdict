@@ -235,29 +235,36 @@ def resolution_ratio(Q, I, err=None, dQ=None, B=None,
     -------
     dict
         R_MSE       plain ratio
-        R_res       resolution-aware ratio, or None if neither dQ nor B given
-        rho         <B (I')^2> / <(h_in^2/12)(I')^2>, the ratio of the two
-                    bias contributions at the grid actually delivered
-        g           reference weight of the resolution term, rho/3
+        rho         <B (I')^2> / <(h_in^2/12)(I')^2>, comparing the resolution
+                    and binning contributions to the expected squared
+                    variation at the grid the profile was delivered on
         B_fraction  mean share of dQ^2 that is collimation and wavelength
                     rather than binning
+        R_res       callable, R_res(g) = (R_MSE + g)/(1 + g)
+        All of R_res, rho and B_fraction are None if neither dQ nor B is given.
 
     Notes
     -----
-    rho is the robust quantity here.  It is dimensionless, invariant under a
-    change of the units of Q, and needs no assumption about the absolute
-    noise normalisation.  A value of rho well above one means the instrument,
-    rather than the binning, is what sets the definition in Q.
+    rho is the quantity that can be read straight off a delivered profile.  A
+    value well above one means the instrument, rather than the binning, sets
+    the definition in Q for the data in hand.  It is a property of that grid,
+    so refining the grid at fixed measurement raises rho as h_in^-2.
 
-    The weight g = G/E*_L is absolute and would require the noise density of
-    the measurement, which reported uncertainties do not supply cleanly since
-    they are tied to whatever grid the profile was delivered on.  Using
-    E*_L = 3 <(h*_L)^2/12 (I')^2> at the optimum gives the exact relation
-    g = (rho/3) (h_in/h*_L)^2, and the value returned is the reference case
-    h_in = h*_L, that is g = rho/3.  A profile supplied more coarsely than
-    the optimum has a larger g and is compressed toward unity more strongly.
-    None of this affects the invariance R_res - 1 = (R_MSE - 1)/(1 + g),
-    which holds for every g >= 0.
+    The weight g = G/E*_L is NOT returned as a number, and deliberately so.
+    Writing E*_L = (h*_L)^2 betabar / 4 at the optimum gives
+    g = 4 <B (I')^2> / ((h*_L)^2 betabar), in which no input bin width
+    appears: g is a property of the profile and of the measurement, not of
+    the delivered grid.  Evaluating it therefore needs h*_L and hence the
+    noise density, which reported uncertainties do not supply on their own.
+    Combining the two expressions gives g = (rho/3)(h_in/h*_L)^2, in which
+    the factors of h_in cancel identically, so that relation is a consistency
+    check rather than a route from rho to g.
+
+    None of this affects the statement that matters.  Since
+    R_res(g) - 1 = (R_MSE - 1)/(1 + g) for every g >= 0, the resolution term
+    moves the ratio toward unity but never across it, whatever g happens to
+    be.  R_res is therefore returned as a callable so that the user may
+    inspect the whole family.
     """
     Q, I, err, dQ = _as_sorted_arrays(Q, I, err, dQ)
     if I_prime is None:
@@ -277,18 +284,15 @@ def resolution_ratio(Q, I, err=None, dQ=None, B=None,
         B = np.asarray(B, dtype=float)
         B_fraction = None
 
-    # rho compares the two bias contributions at the grid the profile was
-    # delivered on.  It is dimensionless, invariant under a change of the
-    # units of Q, and free of any assumption about the absolute noise
-    # normalisation, which real reduced uncertainties do not supply cleanly.
+    # rho compares the resolution and binning contributions to the expected
+    # squared variation at the grid the profile was delivered on.  It is
+    # dimensionless, invariant under a change of the units of Q, and readable
+    # straight off the data.  It is a property of that grid: refining the
+    # grid at fixed measurement raises rho as h_in^-2.
     rho = float(_trapezoid(B * I_prime ** 2, Q)
                 / _trapezoid((h_in ** 2 / 12.0) * I_prime ** 2, Q))
-    # At the optimum E*_L is three times its own bias term, so
-    # g = (rho/3) (h_in/h*_L)^2.  The reference value below assumes the
-    # profile was delivered at approximately the optimal width.
-    g = rho / 3.0
-    return {"R_MSE": R, "R_res": float((R + g) / (1.0 + g)),
-            "g": g, "rho": rho, "B_fraction": B_fraction}
+    return {"R_MSE": R, "rho": rho, "B_fraction": B_fraction,
+            "R_res": lambda g: (R + g) / (1.0 + g)}
 
 
 # ---------------------------------------------------------------------------
@@ -455,15 +459,16 @@ def analyze_binning(Q, I, err=None, dQ=None, geometry="2D",
         rationale = (f"R_MSE = {R:.3f} > 1. Linear-spaced binning gives the "
                      "smaller reconstruction MSE at fixed bin count.")
 
-    if res["R_res"] is not None:
-        rationale += (f" With the instrumental resolution included, R_res = "
-                      f"{res['R_res']:.3f} at g = {res['g']:.3g}. The "
-                      "resolution term is scheme-independent, so it moves the "
+    if res["rho"] is not None:
+        rationale += (f" At the delivered grid the instrumental resolution "
+                      f"contributes {res['rho']:.0f} times as much as the "
+                      "binning to the expected squared variation, and "
+                      f"{res['B_fraction'] * 100:.0f}% of the reported dQ^2 is "
+                      "collimation and wavelength rather than binning. Because "
+                      "the resolution term is scheme-independent it moves the "
                       "ratio toward unity without changing the direction of "
-                      "the verdict.")
-        if res["rho"] is not None and res["rho"] > 1.0:
-            rationale += (f" At the delivered grid the resolution contribution "
-                          f"is {res['rho']:.0f} times the binning contribution.")
+                      "the verdict, for any weight g; use result['R_res'](g) "
+                      "to evaluate (R_MSE + g)/(1 + g).")
 
     if R_F is not None:
         if abs(R_F - 1.0) > tolerance:
@@ -494,7 +499,6 @@ def analyze_binning(Q, I, err=None, dQ=None, geometry="2D",
         "converged": converged,
         "geometry": geo,
         "R_res": res["R_res"],
-        "g": res["g"],
         "rho": res["rho"],
         "B_fraction": res["B_fraction"],
         "R_Fisher_finite": None if R_F is None else float(R_F),
@@ -508,9 +512,11 @@ def analyze_binning(Q, I, err=None, dQ=None, geometry="2D",
         print(f"geometry          = {geo}")
         print(f"R_MSE             = {R:.4f}")
         print(f"R_MSE_subsampled  = {R_sub:.4f}   (converged: {converged})")
-        if res["R_res"] is not None:
-            print(f"R_res             = {res['R_res']:.4f}   "
-                  f"(g = {res['g']:.4g}, rho = {res['rho']:.4g})")
+        if res["rho"] is not None:
+            print(f"rho               = {res['rho']:.4g}   "
+                  f"(B is {res['B_fraction'] * 100:.0f}% of dQ^2)")
+            print(f"R_res(g=1)        = {res['R_res'](1.0):.4f}   "
+                  "[R_res(g) available for any g >= 0]")
         if R_F is not None:
             print(f"R_Fisher_finite   = {R_F:.4f}")
         print(f"optimal h_linear  = {widths['h_linear']:.4g} 1/A "

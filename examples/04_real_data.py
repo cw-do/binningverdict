@@ -26,7 +26,7 @@ def load(path):
 
 
 head = (f"{'file':<40}{'N':>5}{'R_MSE':>9}{'verdict':>9}"
-        f"{'R_res':>9}{'g':>10}{'rho':>8}  flags")
+        f"{'rho':>8}{'B/dQ2':>8}{'R_res(1)':>10}  flags")
 print(head)
 print('-' * len(head))
 
@@ -38,15 +38,20 @@ for path in files:
         flags.append('not-converged')
     if r['background'] is not None and r['background']['Q_trim'] is not None:
         flags.append(f"trim>{r['background']['Q_trim']:.3f}")
-    fmt = lambda v: 'NA' if v is None else f'{v:.3f}'
+    fmt = lambda v: 'NA' if v is None else f'{v:.2f}'
+    Rres1 = 'NA' if r['rho'] is None else f"{r['R_res'](1.0):.3f}"
+    Bfrac = 'NA' if r['B_fraction'] is None else f"{r['B_fraction'] * 100:.0f}%"
     print(f"{path.name:<40}{len(Q):>5d}{r['R_MSE']:>9.3f}{r['verdict']:>9}"
-          f"{fmt(r['R_res']):>9}{fmt(r['g']):>10}{fmt(r['rho']):>8}"
+          f"{fmt(r['rho']):>8}{Bfrac:>8}{Rres1:>10}"
           f"  {','.join(flags)}")
 
 print()
-print("R_res is the resolution-aware ratio (R + g)/(1 + g).  Because the same")
-print("constant enters both schemes it can only move the ratio toward unity,")
-print("never across it, so the direction of the verdict is invariant.")
-print("rho compares the resolution and binning bias terms at the delivered")
-print("grid; values well above one mean the instrument, not the binning,")
-print("sets the Q definition.")
+print("rho compares the resolution and binning contributions to the expected")
+print("squared variation at the grid each profile was delivered on. Values")
+print("well above one mean the instrument, not the binning, sets the Q")
+print("definition. R_res(1) is the resolution-aware ratio evaluated at g = 1,")
+print("shown only as a representative point: the weight g is a property of")
+print("the profile and of the measurement, not of the delivered grid, so")
+print("R_res is returned as a callable. Whatever g may be, the identity")
+print("R_res(g) - 1 = (R_MSE - 1)/(1 + g) keeps the sign of R_MSE - 1, so the")
+print("direction of the verdict is invariant.")

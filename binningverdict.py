@@ -14,9 +14,11 @@ Input files are plain-text I(q) tables with at least three columns:
     Q   intensity   intensity_error   [Q_error]
 
 The optional fourth column is the instrumental Q-resolution.  When present it
-is used to report the resolution-aware ratio in addition to the plain one;
-pass --no-resolution to ignore it.  Header and comment lines are skipped
-automatically.
+is used to report rho, which compares the resolution and binning
+contributions at the delivered grid, together with the share of dQ^2 that is
+collimation rather than binning and the resolution-aware ratio evaluated at
+g = 1 as a representative point.  Pass --no-resolution to ignore the column.
+Header and comment lines are skipped automatically.
 """
 
 from __future__ import annotations
@@ -36,9 +38,9 @@ REPORT_FIELDS = (
     "R_MSE",
     "R_MSE_subsampled",
     "converged",
-    "R_res",
-    "g",
     "rho",
+    "B_fraction",
+    "R_res_at_g1",
     "geometry",
     "Q_trim",
     "rationale",
@@ -171,9 +173,10 @@ def analyze_file(path: Path, geometry="2D", use_resolution=True):
             "R_MSE": result["R_MSE"],
             "R_MSE_subsampled": result["R_MSE_subsampled"],
             "converged": result["converged"],
-            "R_res": result["R_res"],
-            "g": result["g"],
             "rho": result["rho"],
+            "B_fraction": result["B_fraction"],
+            "R_res_at_g1": (None if result["rho"] is None
+                            else result["R_res"](1.0)),
             "geometry": result["geometry"],
             "Q_trim": None if bg is None else bg["Q_trim"],
             "rationale": result["rationale"],
@@ -236,10 +239,10 @@ def main(argv=None):
     else:
         write_report(rows, args.output)
         print(f"Wrote {args.output} with {len(rows)} rows.")
-        print(f"{'file':<44}{'verdict':>9}{'R_MSE':>9}{'R_res':>9}")
+        print(f"{'file':<44}{'verdict':>9}{'R_MSE':>9}{'rho':>9}")
         for r in rows:
             print(f"{Path(r['file']).name:<44}{r['verdict']:>9}"
-                  f"{format_value(r['R_MSE']):>9}{format_value(r['R_res']):>9}")
+                  f"{format_value(r['R_MSE']):>9}{format_value(r['rho']):>9}")
 
     return 1 if any(r["verdict"] == "ERROR" for r in rows) else 0
 

@@ -81,26 +81,43 @@ def _synthetic_with_resolution(n=300):
 
 
 def test_resolution_moves_toward_unity_without_crossing():
+    """R_res(g) approaches unity from one side for every g >= 0."""
     Q, I, err, dQ = _synthetic_with_resolution()
     out = resolution_ratio(Q, I, err=err, dQ=dQ)
-    R, R_res = out['R_MSE'], out['R_res']
-    assert out['g'] >= 0.0
-    assert np.sign(R_res - 1.0) == np.sign(R - 1.0)
-    assert abs(R_res - 1.0) <= abs(R - 1.0) + 1e-12
+    R = out['R_MSE']
+    prev = abs(R - 1.0)
+    for g in [0.0, 0.1, 1.0, 10.0, 1e3, 1e6]:
+        R_res = out['R_res'](g)
+        assert np.sign(R_res - 1.0) == np.sign(R - 1.0) or R_res == 1.0
+        assert abs(R_res - 1.0) <= prev + 1e-12
+        prev = abs(R_res - 1.0)
+    assert out['R_res'](1e12) == pytest.approx(1.0, abs=1e-6)
 
 
 def test_resolution_identity():
-    """R_res must satisfy (R + g)/(1 + g) exactly."""
+    """R_res(g) must satisfy (R + g)/(1 + g) exactly."""
     Q, I, err, dQ = _synthetic_with_resolution()
     o = resolution_ratio(Q, I, err=err, dQ=dQ)
-    assert o['R_res'] == pytest.approx((o['R_MSE'] + o['g']) / (1 + o['g']))
+    for g in (0.3, 1.0, 7.0):
+        assert o['R_res'](g) == pytest.approx((o['R_MSE'] + g) / (1 + g))
+        assert o['R_res'](g) - 1.0 == pytest.approx((o['R_MSE'] - 1.0) / (1 + g))
 
 
-def test_g_invariant_under_Q_rescaling():
-    """g is absolute, so it must not depend on the units of Q."""
+def test_rho_scales_as_h_in_squared_inverse():
+    """rho belongs to the delivered grid: refining it raises rho as h^-2."""
+    out = []
+    for n in (200, 400):
+        Q, I, err, _ = _synthetic_with_resolution(n)
+        dQ = np.sqrt(0.001 ** 2 + (0.05 * Q) ** 2 + np.gradient(Q) ** 2 / 12)
+        out.append(resolution_ratio(Q, I, err=err, dQ=dQ)['rho'])
+    assert out[1] / out[0] == pytest.approx(4.0, rel=0.25)
+
+
+def test_rho_invariant_under_Q_rescaling():
+    """rho is dimensionless and must not depend on the units of Q."""
     Q, I, err, dQ = _synthetic_with_resolution()
-    a = resolution_ratio(Q, I, err=err, dQ=dQ)['g']
-    b = resolution_ratio(10 * Q, I, err=err, dQ=10 * dQ)['g']
+    a = resolution_ratio(Q, I, err=err, dQ=dQ)['rho']
+    b = resolution_ratio(10 * Q, I, err=err, dQ=10 * dQ)['rho']
     assert a == pytest.approx(b, rel=1e-6)
 
 
@@ -108,7 +125,7 @@ def test_no_resolution_returns_none():
     Q = grid(200)
     I = guinier(Q)
     out = resolution_ratio(Q, I, err=np.sqrt(I))
-    assert out['R_res'] is None and out['g'] is None
+    assert out['R_res'] is None and out['rho'] is None
 
 
 # ---------------------------------------------------------------------------
@@ -160,10 +177,11 @@ def test_workflow_returns_required_keys():
     Q, I, err, dQ = _synthetic_with_resolution()
     res = analyze_binning(Q, I, err=err, dQ=dQ)
     for key in ('verdict', 'R_MSE', 'R_MSE_subsampled', 'converged',
-                'geometry', 'R_res', 'g', 'rho', 'B_fraction',
+                'geometry', 'R_res', 'rho', 'B_fraction',
                 'R_Fisher_finite', 'background', 'h_linear', 'delta_log',
                 'rationale'):
         assert key in res
+    assert callable(res['R_res'])
 
 
 def test_optimal_widths_positive_and_scale_correctly():

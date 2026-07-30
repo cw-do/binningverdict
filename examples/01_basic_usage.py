@@ -19,9 +19,20 @@ result = analyze_binning(Q, I, err=err, dQ=dQ, geometry='2D', verbose=True)
 
 print()
 print('--- selected fields -------------------------------------------------')
-for key in ('verdict', 'R_MSE', 'R_res', 'g', 'rho', 'B_fraction',
+for key in ('verdict', 'R_MSE', 'rho', 'B_fraction',
             'converged', 'h_linear', 'delta_log'):
     print(f'  {key:<12} {result[key]}')
+
+# R_res is returned as a callable, because the weight g is a property of the
+# profile and of the measurement rather than of the delivered grid, and
+# evaluating it numerically needs the noise density.  The invariance
+#     R_res(g) - 1 = (R_MSE - 1)/(1 + g)
+# holds for every g >= 0, so the direction of the verdict never changes.
+print()
+print('  resolution-aware ratio over the whole family:')
+print(f"  {'g':>10}{'R_res':>10}")
+for g in (0.0, 0.3, 1.0, 3.0, 10.0, 100.0):
+    print(f'  {g:>10.1f}{result["R_res"](g):>10.3f}')
 
 # Without the resolution column the plain ratio is unchanged and the
 # resolution fields come back as None.
